@@ -15,14 +15,18 @@ def _find_binary(ctx, binary_name):
         return _error("Unable to find binary: {}".format(binary_name))
     return _success(binary)
 
-def _execute(ctx, binary, args):
-    result = ctx.execute([binary] + args)
+def _execute(ctx, binary, args, environment):
+    result = ctx.execute([binary] + args, environment = environment)
     if result.return_code != 0:
         return _error("Failed execute {} {}".format(binary, args))
     return _success(result.stdout)
 
 def _pkg_config(ctx, pkg_config, pkg_name, args):
-    return _execute(ctx, pkg_config, [pkg_name] + args)
+    if ctx.attr.pkg_config_path != None:
+        environment = { "PKG_CONFIG_PATH": ctx.attr.pkg_config_path }
+    else:
+        environment = {}
+    return _execute(ctx, pkg_config, [pkg_name] + args, environment)
 
 def _check(ctx, pkg_config, pkg_name):
     exist = _pkg_config(ctx, pkg_config, pkg_name, ["--exists"])
@@ -188,6 +192,7 @@ pkg_config = repository_rule(
         "linkopts": attr.string_list(doc = "Extra linkopts value."),
         "copts": attr.string_list(doc = "Extra copts value."),
         "ignore_opts": attr.string_list(doc = "Ignore listed opts in copts or linkopts."),
+        "pkg_config_path": attr.string(doc = "PKG_CONFIG_PATH value.")
     },
     local = True,
     implementation = _pkg_config_impl,
