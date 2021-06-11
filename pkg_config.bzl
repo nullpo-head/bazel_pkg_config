@@ -21,12 +21,8 @@ def _execute(ctx, binary, args, environment):
         return _error("Failed execute {} {}".format(binary, args))
     return _success(result.stdout)
 
-def _extract_pkgconfig_dirs(source):
+def _extract_pkgconfig_dirs(files):
     answer = []
-
-    files = source.files.to_list()
-    if len(files) == 0:
-        return answer
 
     for file in files:
         if file.extension == "pc":
@@ -38,8 +34,8 @@ def _pkg_config(ctx, pkg_config, pkg_name, args):
     pkg_config_path = ""
     if ctx.attr.pkg_config_path != None:
         pkg_config_path = ctx.attr.pkg_config_path
-    if ctx.attr.pkg_config_files != None and len(ctx.attr.pkg_config_files) > 0:
-        pkg_config_path = pkg_config_path + ":".join(_extract_pkgconfig_dirs(ctx.attr.pkg_config_files))
+    if ctx.attr.pkg_config_files != None and len(ctx.files.pkg_config_files) > 0:
+        pkg_config_path = pkg_config_path + ":".join(_extract_pkgconfig_dirs(ctx.files.pkg_config_files))
     if len(pkg_config_path) > 0:
         environment = { "PKG_CONFIG_PATH": pkg_config_path }
     else:
@@ -211,7 +207,7 @@ pkg_config = repository_rule(
         "copts": attr.string_list(doc = "Extra copts value."),
         "ignore_opts": attr.string_list(doc = "Ignore listed opts in copts or linkopts."),
         "pkg_config_path": attr.string(doc = "PKG_CONFIG_PATH value."),
-        "pkg_config_files": attr.label(doc = ".pc files in the source directory to be considered into by PKG_CONFIG_PATH", allow_files = True),
+        "pkg_config_files": attr.label(doc = ".pc files in the source directory to be considered into by PKG_CONFIG_PATH", allow_files = ["pc"]),
     },
     local = True,
     implementation = _pkg_config_impl,
