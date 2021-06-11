@@ -42,7 +42,7 @@ def _pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, args):
         pkg_config_path = pkg_config_path + ":".join(_extract_pkgconfig_dirs(pkg_config_files))
     if len(pkg_config_path) > 0:
         environment = { "PKG_CONFIG_PATH": pkg_config_path }
-    else
+    else:
         environment = {}
     return _execute(ctx, pkg_config, [pkg_name] + args, environment)
 
@@ -211,7 +211,7 @@ pkg_config = repository_rule(
         "copts": attr.string_list(doc = "Extra copts value."),
         "ignore_opts": attr.string_list(doc = "Ignore listed opts in copts or linkopts."),
         "pkg_config_path": attr.string(doc = "PKG_CONFIG_PATH value."),
-        "pkg_config_files": attr.label(doc = ".pc files in the source directory to be considered into by PKG_CONFIG_PATH" allow_files = True)
+        "pkg_config_files": attr.label(doc = ".pc files in the source directory to be considered into by PKG_CONFIG_PATH", allow_files = True),
     },
     local = True,
     implementation = _pkg_config_impl,
