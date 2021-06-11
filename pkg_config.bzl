@@ -21,30 +21,48 @@ def _execute(ctx, binary, args, environment):
         return _error("Failed execute {} {}".format(binary, args))
     return _success(result.stdout)
 
-def _pkg_config(ctx, pkg_config, pkg_name, args):
+def _extract_pkgconfig_dirs(source):
+    answer = []
+
+    files = source.files.to_list()
+    if len(files) == 0:
+        return answer
+
+    for file in files:
+        if file_.extension == "pc":
+            answer.append("\"" + file.dirname + "\"")
+
+    return answer
+
+def _pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, args):
+    pkg_config_path = ""
     if ctx.attr.pkg_config_path != None:
-        environment = { "PKG_CONFIG_PATH": ctx.attr.pkg_config_path }
-    else:
+        pkg_config_path = ctx.attr.pkg_config_path
+    if pkg_config_files != None and len(pkg_config_files) > 0:
+        pkg_config_path = pkg_config_path + ":".join(_extract_pkgconfig_dirs(pkg_config_files))
+    if len(pkg_config_path) > 0:
+        environment = { "PKG_CONFIG_PATH": pkg_config_path }
+    else
         environment = {}
     return _execute(ctx, pkg_config, [pkg_name] + args, environment)
 
-def _check(ctx, pkg_config, pkg_name):
-    exist = _pkg_config(ctx, pkg_config, pkg_name, ["--exists"])
+def _check(ctx, pkg_config, pkg_name, pkg_config_files):
+    exist = _pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, ["--exists"])
     if exist.error != None:
         return _error("Package {} does not exist".format(pkg_name))
 
     if ctx.attr.version != "":
-        version = _pkg_config(ctx, pkg_config, pkg_name, ["--exact-version", ctx.attr.version])
+        version = _pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, ["--exact-version", ctx.attr.version])
         if version.error != None:
             return _error("Require {} version = {}".format(pkg_name, ctx.attr.version))
 
     if ctx.attr.min_version != "":
-        version = _pkg_config(ctx, pkg_config, pkg_name, ["--atleast-version", ctx.attr.min_version])
+        version = _pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, ["--atleast-version", ctx.attr.min_version])
         if version.error != None:
             return _error("Require {} version >= {}".format(pkg_name, ctx.attr.min_version))
 
     if ctx.attr.max_version != "":
-        version = _pkg_config(ctx, pkg_config, pkg_name, ["--max-version", ctx.attr.max_version])
+        version = _pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, ["--max-version", ctx.attr.max_version])
         if version.error != None:
             return _error("Require {} version <= {}".format(pkg_name, ctx.attr.max_version))
 
@@ -63,21 +81,21 @@ def _extract_prefix(flags, prefix, strip = True):
     return stripped, remain
 
 def _includes(ctx, pkg_config, pkg_name):
-    includes = _split(_pkg_config(ctx, pkg_config, pkg_name, ["--cflags-only-I"]))
+    includes = _split(_pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, ["--cflags-only-I"]))
     if includes.error != None:
         return includes
     includes, unused = _extract_prefix(includes.value, "-I", strip = True)
     return _success(includes)
 
 def _copts(ctx, pkg_config, pkg_name):
-    return _split(_pkg_config(ctx, pkg_config, pkg_name, [
+    return _split(_pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, [
         "--cflags-only-other",
         "--libs-only-L",
         "--static",
     ]))
 
 def _linkopts(ctx, pkg_config, pkg_name):
-    return _split(_pkg_config(ctx, pkg_config, pkg_name, [
+    return _split(_pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, [
         "--libs-only-other",
         "--libs-only-l",
         "--static",
@@ -101,8 +119,8 @@ def _symlinks(ctx, basename, srcpaths):
         result += [str(dest)[rootlen:]]
     return result
 
-def _deps(ctx, pkg_config, pkg_name):
-    deps = _split(_pkg_config(ctx, pkg_config, pkg_name, [
+def _deps(ctx, pkg_config, pkg_config_files, pkg_name):
+    deps = _split(_pkg_config(ctx, pkg_config, pkg_name, pkg_config_files, [
         "--libs-only-L",
         "--static",
     ]))
@@ -131,7 +149,7 @@ def _pkg_config_impl(ctx):
         return pkg_config
     pkg_config = pkg_config.value
 
-    check = _check(ctx, pkg_config, pkg_name)
+    check = _check(ctx, pkg_config, pkg_name, ctx.attr.pkg_config_files)
     if check.error != None:
         return check
 
@@ -192,7 +210,8 @@ pkg_config = repository_rule(
         "linkopts": attr.string_list(doc = "Extra linkopts value."),
         "copts": attr.string_list(doc = "Extra copts value."),
         "ignore_opts": attr.string_list(doc = "Ignore listed opts in copts or linkopts."),
-        "pkg_config_path": attr.string(doc = "PKG_CONFIG_PATH value.")
+        "pkg_config_path": attr.string(doc = "PKG_CONFIG_PATH value."),
+        "pkg_config_files": attr.label(doc = ".pc files in the source directory to be considered into by PKG_CONFIG_PATH" allow_files = True)
     },
     local = True,
     implementation = _pkg_config_impl,
